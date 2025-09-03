@@ -1,3 +1,4 @@
+%%writefile app.py
 # ------------------------------------------------------------
 # 3-year RFS & OS Predictor (RSF models, 14 variables)
 # ------------------------------------------------------------
@@ -89,8 +90,8 @@ if height_str and weight_str:
 cea_str   = st.text_input("CEA (ng/mL)", placeholder="ex) 4.5")
 ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="ex) 25")
 
-asa   = st.selectbox("ASA-PS", asa_map.keys(), index=None, placeholder="Select ASA-PS")
-surg  = st.selectbox("Surgical method", surg_map.keys(), index=None, placeholder="Select surgical method")
+asa   = st.selectbox("ASA-PS", list(asa_map.keys()), index=None, placeholder="Select ASA-PS")
+surg  = st.selectbox("Surgical method", list(surg_map.keys()), index=None, placeholder="Select surgical method")
 
 # --- 術式に応じて再建方法の選択肢を制御 ---
 if surg == "PG":
@@ -102,12 +103,12 @@ else:  # DG の場合
 
 recon = st.selectbox("Reconstruction", recon_options, index=None, placeholder="Select reconstruction")
 
-macro = st.selectbox("Macroscopic type", macro_map.keys(), index=None, placeholder="Select macroscopic type")
+macro = st.selectbox("Macroscopic type", list(macro_map.keys()), index=None, placeholder="Select macroscopic type")
 diam  = st.text_input("Tumor diameter (mm)", placeholder="ex) 45")
-histo = st.selectbox("Histology", histo_map.keys(), index=None, placeholder="Select histology")
-vcat  = st.selectbox("Vascular invasion (v)", v_map.keys(), index=None, placeholder="Select vascular invasion")
-pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="Select pT")
-pn    = st.selectbox("Pathological N", pn_map.keys(), index=None, placeholder="Select pN")
+histo = st.selectbox("Histology", list(histo_map.keys()), index=None, placeholder="Select histology")
+vcat  = st.selectbox("Vascular invasion (v)", list(v_map.keys()), index=None, placeholder="Select vascular invasion")
+pt    = st.selectbox("Pathological T", list(pt_map.keys()), index=None, placeholder="Select pT")
+pn    = st.selectbox("Pathological N", list(pn_map.keys()), index=None, placeholder="Select pN")
 
 # --- pT & pN に基づき stage を自動算出 ---
 stage_options = []
@@ -128,6 +129,18 @@ stage = st.selectbox(
 # 5. Prediction
 # ────────────────────────────────────────────────────────────
 if st.button("Predict"):
+    # 入力チェック（未選択の有無）
+    required_selects = {
+        "ASA-PS": asa, "Surgical method": surg, "Reconstruction": recon,
+        "Macroscopic type": macro, "Histology": histo, "Vascular invasion (v)": vcat,
+        "Pathological T": pt, "Pathological N": pn, "Stage": stage
+    }
+    missing = [k for k, v in required_selects.items() if v is None]
+    if missing:
+        st.error("Please select: " + ", ".join(missing))
+        st.stop()
+
+    # 数値の検証
     try:
         age = int(age_str)
         h = float(height_str)
@@ -140,6 +153,7 @@ if st.button("Predict"):
         st.error("Age, Height, Weight, CEA, CA19-9, Diameter must be numeric.")
         st.stop()
 
+    # 入力DF
     inp = pd.DataFrame([{
         "age": age,
         "bmi": bmi,
@@ -159,9 +173,9 @@ if st.button("Predict"):
 
     # 学習時の特徴量順に合わせる
     inp_rfs = inp[rsf_rfs.feature_names_in_]
-    inp_os  = inp[rsf_os.feature_names_in_]
+    inp_os  = inp[rsf_os .feature_names_in_]
 
-    # 予測
+    # 予測（共通グリッドへ補間）
     time_grid = np.arange(0, 37)
 
     surv_rfs = np.mean(
@@ -173,8 +187,12 @@ if st.button("Predict"):
          for fn in rsf_os.predict_survival_function(inp_os)], axis=0
     )
 
+    # ★ 一貫性制約：常に OS(t) ≥ RFS(t) を強制
+    surv_os = np.maximum(surv_os, surv_rfs)
+
+    # 3年値
     rfs36 = float(surv_rfs[time_grid == 36]) * 100
-    os36  = float(surv_os[time_grid == 36]) * 100
+    os36  = float(surv_os [time_grid == 36]) * 100
 
     st.success(f"Predicted 3-year RFS: **{rfs36:.1f}%**")
     st.success(f"Predicted 3-year OS:  **{os36:.1f}%**")
@@ -182,7 +200,7 @@ if st.button("Predict"):
     # 図示
     fig, ax = plt.subplots(figsize=(7,5))
     ax.plot(time_grid, surv_rfs, lw=2, label="RFS")
-    ax.plot(time_grid, surv_os,  lw=2, label="OS")
+    ax.plot(time_grid, surv_os,  lw=2, label="OS (reconciled)")
     ax.set_xlabel("Months after surgery")
     ax.set_ylabel("Survival probability")
     ax.set_xlim(0, 36)
@@ -192,6 +210,7 @@ if st.button("Predict"):
     ax.legend()
     st.pyplot(fig)
 
+# 注意書き
 st.markdown(
     """
     <div style='margin-top:2rem; font-size:0.85em; color:gray;'>
@@ -203,3 +222,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
+
