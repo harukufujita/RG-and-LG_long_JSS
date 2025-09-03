@@ -212,24 +212,40 @@ if st.button("Predict"):
     except Exception as e:
         st.error(f"Feature alignment error: {e}")
         st.stop()
+    # 予測
+    time_grid = np.arange(0, 37)
+    surv_rfs = np.mean(
+        [np.interp(time_grid, fn.x, fn.y) for fn in rsf_rfs.predict_survival_function(inp_rfs)],
+        axis=0
+    )
+    surv_os = np.mean(
+        [np.interp(time_grid, fn.x, fn.y) for fn in rsf_os.predict_survival_function(inp_os)],
+        axis=0
+    )
 
-# 予測
-time_grid = np.arange(0, 37)
-surv_rfs = np.mean(
-    [np.interp(time_grid, fn.x, fn.y) for fn in rsf_rfs.predict_survival_function(inp_rfs)],
-    axis=0
-)
-surv_os = np.mean(
-    [np.interp(time_grid, fn.x, fn.y) for fn in rsf_os.predict_survival_function(inp_os)],
-    axis=0
-)
+    # ★ OS は常に RFS 以上に補正（OS ≥ RFS を保証）
+    surv_os = np.maximum(surv_os, surv_rfs)
 
-# ★ OS は常に RFS 以上に補正（OS ≥ RFS を保証）
-surv_os = np.maximum(surv_os, surv_rfs)
+    # 3年値
+    rfs36 = float(surv_rfs[time_grid == 36]) * 100
+    os36  = float(surv_os[time_grid == 36]) * 100
 
-# 3年値
-rfs36 = float(surv_rfs[time_grid == 36]) * 100
-os36  = float(surv_os[time_grid == 36]) * 100
+    st.success(f"Predicted 3-year RFS: **{rfs36:.1f}%**")
+    st.success(f"Predicted 3-year OS:  **{os36:.1f}%**")
+
+    # 図示
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(time_grid, surv_rfs, lw=2, label="RFS")
+    ax.plot(time_grid, surv_os,  lw=2, label="OS")
+    ax.set_xlabel("Months after surgery")
+    ax.set_ylabel("Survival probability")
+    ax.set_xlim(0, 36)
+    ax.set_ylim(0, 1.05)
+    ax.set_xticks(np.arange(0, 37, 6))
+    ax.grid(alpha=0.3)
+    ax.legend()
+    st.pyplot(fig)
+
 
     # 図示
     fig, ax = plt.subplots(figsize=(7, 5))
