@@ -76,16 +76,20 @@ age_str = st.text_input("Age (years)", placeholder="ex) 65")
 height_str = st.text_input("Height (cm)", placeholder="ex) 160.0")
 weight_str = st.text_input("Weight (kg)", placeholder="ex) 50.0")
 
-# --- BMI: 最初からBOXを表示し、直接入力も可能 ---
-bmi_str = st.text_input("BMI (kg/m²)", placeholder="ex) 19.5")
+# --- BMI: session_stateで管理して自動計算を反映 ---
+if "bmi" not in st.session_state:
+    st.session_state["bmi"] = ""
 
-# 身長と体重から自動計算し、入力欄を上書き
+# BMI入力欄（直接入力も可能）
+bmi_str = st.text_input("BMI (kg/m²)", value=st.session_state["bmi"], key="bmi")
+
+# 身長・体重から自動計算して上書き
 if height_str and weight_str:
     try:
         h = float(height_str)
         w = float(weight_str)
         bmi_val = w / (h / 100) ** 2
-        bmi_str = f"{bmi_val:.1f}"  # 自動計算結果で上書き
+        st.session_state["bmi"] = f"{bmi_val:.1f}"
     except ValueError:
         st.warning("Height and Weight must be numeric.")
 
@@ -113,7 +117,7 @@ pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="S
 pn    = st.selectbox("Pathological N", pn_map.keys(), index=None, placeholder="Select pN")
 
 # --- pStage: 最初からBOXを出しておき、pt/pnで制御 ---
-stage_options = list(stage_map.keys())  # 全選択肢を初期表示
+stage_options = list(stage_map.keys())
 if pt and pn:
     auto_stage = determine_stage(pt, pn)
     if auto_stage:
@@ -134,7 +138,7 @@ if st.button("Predict"):
         age = int(age_str)
         h = float(height_str)
         w = float(weight_str)
-        bmi = float(bmi_str)  # ← BMIは入力または自動計算の値を採用
+        bmi = float(st.session_state["bmi"])  # session_stateから取得
         cea = float(cea_str)
         ca199 = float(ca199_str)
         diam_val = float(diam)
@@ -202,4 +206,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
