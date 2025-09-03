@@ -96,11 +96,12 @@ if st.button("Calculate BMI from Height & Weight"):
         if h > 0:
             bmi_val = w / (h / 100) ** 2
             st.session_state.bmi = f"{bmi_val:.1f}"
-            st.experimental_rerun()
+            st.rerun()  # ← st.experimental_rerun() から変更
         else:
             st.error("Height must be > 0.")
     except ValueError:
         st.error("Height and Weight must be numeric.")
+
 
 # BMI入力欄
 bmi_str = st.text_input(
