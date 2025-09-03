@@ -34,7 +34,7 @@ pt_map = {
 pn_map = {"pN0": 0, "pN1": 1, "pN2": 2, "pN3a": 3, "pN3b": 4}
 stage_map = {
     "0": 0, "IA": 1, "IB": 2, "IIA": 3, "IIB": 4,
-    "IIIA": 5, "IIIB": 6, "IIIC": 7, "IV": 8
+    "IIIA": 5, "IIIB": 6, "IIIC": 7, "IV (CY1)": 8
 }
 
 # ────────────────────────────────────────────────────────────
@@ -115,10 +115,10 @@ if pt and pn:
     auto_stage = determine_stage(pt, pn)
     if auto_stage:
         stage_options.append(auto_stage)
-    stage_options.append("IV")
+    stage_options.append("IV (CY1)")
 
 stage = st.selectbox(
-    "Pathological stage (auto-calculated from pT & pN, or IV)",
+    "Pathological stage (auto-calculated from pT & pN, or IV (CY1))",
     stage_options,
     index=None,
     placeholder="Select stage"
