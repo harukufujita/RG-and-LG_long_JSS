@@ -76,13 +76,16 @@ age_str = st.text_input("Age (years)", placeholder="ex) 65")
 height_str = st.text_input("Height (cm)", placeholder="ex) 160.0")
 weight_str = st.text_input("Weight (kg)", placeholder="ex) 50.0")
 
-bmi_val = None
+# --- BMI: 最初からBOXを表示し、直接入力も可能 ---
+bmi_str = st.text_input("BMI (kg/m²)", placeholder="ex) 19.5")
+
+# 身長と体重から自動計算し、入力欄を上書き
 if height_str and weight_str:
     try:
         h = float(height_str)
         w = float(weight_str)
         bmi_val = w / (h / 100) ** 2
-        st.info(f"Calculated BMI: **{bmi_val:.1f}**")
+        bmi_str = f"{bmi_val:.1f}"  # 自動計算結果で上書き
     except ValueError:
         st.warning("Height and Weight must be numeric.")
 
@@ -109,20 +112,19 @@ vcat  = st.selectbox("Vascular invasion (v)", v_map.keys(), index=None, placehol
 pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="Select pT")
 pn    = st.selectbox("Pathological N", pn_map.keys(), index=None, placeholder="Select pN")
 
-# --- pT & pN に基づき stage を自動算出 ---
-stage_options = []
+# --- pStage: 最初からBOXを出しておき、pt/pnで制御 ---
+stage_options = list(stage_map.keys())  # 全選択肢を初期表示
 if pt and pn:
     auto_stage = determine_stage(pt, pn)
     if auto_stage:
-        stage_options.append(auto_stage)
-    stage_options.append("IV (CY1)")
+        stage_options = [auto_stage, "IV (CY1)"]
 
 stage = st.selectbox(
     "Pathological stage (auto-calculated from pT & pN, or IV (CY1))",
     stage_options,
     index=None,
     placeholder="Select stage"
-) if stage_options else None
+)
 
 # ────────────────────────────────────────────────────────────
 # 5. Prediction
@@ -132,12 +134,12 @@ if st.button("Predict"):
         age = int(age_str)
         h = float(height_str)
         w = float(weight_str)
-        bmi = w / (h / 100) ** 2
+        bmi = float(bmi_str)  # ← BMIは入力または自動計算の値を採用
         cea = float(cea_str)
         ca199 = float(ca199_str)
         diam_val = float(diam)
     except ValueError:
-        st.error("Age, Height, Weight, CEA, CA19-9, Diameter must be numeric.")
+        st.error("Age, Height, Weight, BMI, CEA, CA19-9, Diameter must be numeric.")
         st.stop()
 
     inp = pd.DataFrame([{
@@ -157,11 +159,9 @@ if st.button("Predict"):
         "p_stage3": stage_map[stage] if stage else None,
     }])
 
-    # 学習時の特徴量順に合わせる
     inp_rfs = inp[rsf_rfs.feature_names_in_]
     inp_os  = inp[rsf_os.feature_names_in_]
 
-    # 予測
     time_grid = np.arange(0, 37)
 
     surv_rfs = np.mean(
@@ -179,7 +179,6 @@ if st.button("Predict"):
     st.success(f"Predicted 3-year RFS: **{rfs36:.1f}%**")
     st.success(f"Predicted 3-year OS:  **{os36:.1f}%**")
 
-    # 図示
     fig, ax = plt.subplots(figsize=(7,5))
     ax.plot(time_grid, surv_rfs, lw=2, label="RFS")
     ax.plot(time_grid, surv_os,  lw=2, label="OS")
@@ -203,3 +202,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
