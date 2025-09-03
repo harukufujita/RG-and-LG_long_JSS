@@ -74,42 +74,42 @@ for key, default in [("height_str", ""), ("weight_str", ""), ("bmi", "")]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-# Height/Weight 変更時に BMI を再計算
-def recompute_bmi():
-    hs = st.session_state.get("height_str", "")
-    ws = st.session_state.get("weight_str", "")
-    try:
-        h = float(hs)
-        w = float(ws)
-        if h > 0:
-            st.session_state["bmi"] = f"{w / (h / 100) ** 2:.1f}"
-    except Exception:
-        pass  # 無入力/非数値なら何もしない
-
 age_str = st.text_input("Age (years)", placeholder="e.g. 65")
 
-# Height/Weight（手術時）: help と placeholder
+# Height/Weight（手術時）
 height_str = st.text_input(
     "Height (cm) (at surgery)",
     key="height_str",
     placeholder="e.g. 160.0 — unnecessary if entering BMI directly",
     help="Height (at surgery, used for BMI calculation).",
-    on_change=recompute_bmi,
 )
 weight_str = st.text_input(
     "Weight (kg) (at surgery)",
     key="weight_str",
     placeholder="e.g. 50.0 — unnecessary if entering BMI directly",
     help="Weight (at surgery, used for BMI calculation).",
-    on_change=recompute_bmi,
 )
 
-# BMI（手術時）: 直接入力可。Height/Weight 変更時は自動上書き
+# BMI入力欄
 bmi_str = st.text_input(
     "BMI (kg/m²) (at surgery)",
     key="bmi",
-    help="BMI at surgery. Automatically calculated from Height and Weight, but can also be entered directly.",
+    help="BMI at surgery. Press the button below to calculate from Height and Weight, or enter directly.",
 )
+
+# BMIを計算するボタン
+if st.button("Calculate BMI from Height & Weight"):
+    try:
+        h = float(st.session_state["height_str"])
+        w = float(st.session_state["weight_str"])
+        if h > 0:
+            bmi_val = w / (h / 100) ** 2
+            st.session_state["bmi"] = f"{bmi_val:.1f}"
+            st.success(f"BMI calculated: {st.session_state['bmi']}")
+        else:
+            st.error("Height must be > 0.")
+    except ValueError:
+        st.error("Height and Weight must be numeric.")
 
 cea_str   = st.text_input("CEA (ng/mL)", placeholder="e.g. 4.5")
 ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="e.g. 25")
@@ -158,20 +158,20 @@ stage = st.selectbox(
 )
 
 # ────────────────────────────────────────────────────────────
-# 5. Prediction（Height/Weight 任意。Diameter 未入力は pT で内部補完。表示なし）
+# 5. Prediction
 # ────────────────────────────────────────────────────────────
 if st.button("Predict"):
     # 必須: age, bmi, cea, ca19-9
     try:
         age = int(age_str)
-        bmi = float(st.session_state["bmi"])  # 手入力 or 自動計算
+        bmi = float(st.session_state["bmi"])  # 手入力 or 計算済み
         cea = float(cea_str)
         ca199 = float(ca199_str)
     except ValueError:
         st.error("Age, BMI, CEA, and CA19-9 must be numeric.")
         st.stop()
 
-    # 腫瘍径：入力があれば使用。無ければ pT がある場合のみ内部補完（メッセージは出さない）
+    # 腫瘍径：入力があれば使用。無ければ pT がある場合のみ内部補完
     diam_val = None
     if diam and str(diam).strip():
         try:
@@ -183,7 +183,7 @@ if st.button("Predict"):
         if pt:
             diam_val = impute_diameter_from_pt(pt)
 
-    # 入力行の構築（pT/pN/Stage など未選択があれば下の KeyError で通常メッセージ）
+    # 入力行の構築
     try:
         inp = pd.DataFrame([{
             "age": age,
@@ -212,6 +212,7 @@ if st.button("Predict"):
     except Exception as e:
         st.error(f"Feature alignment error: {e}")
         st.stop()
+
     # 予測
     time_grid = np.arange(0, 37)
     surv_rfs = np.mean(
@@ -223,7 +224,7 @@ if st.button("Predict"):
         axis=0
     )
 
-    # ★ OS は常に RFS 以上に補正（OS ≥ RFS を保証）
+    # ★ OS は常に RFS 以上に補正
     surv_os = np.maximum(surv_os, surv_rfs)
 
     # 3年値
