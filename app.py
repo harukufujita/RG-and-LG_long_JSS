@@ -57,10 +57,7 @@ st.markdown(
 )
 
 # ────────────────────────────────────────────────────────────
-# 4. Input widgets（Height → Weight → BMI の順）
-#    - (at surgery) の注釈をラベルに付与
-#    - help で補足（Height/Weight は BMI 計算用、BMI は直接入力も可）
-#    - BMI は on_change コールバックで自動反映（直接入力も可）
+# 4. Input widgets（Height → Weight → BMI）
 # ────────────────────────────────────────────────────────────
 
 # session_state 初期化
@@ -68,7 +65,7 @@ for key, default in [("height_str", ""), ("weight_str", ""), ("bmi", "")]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-# Height/Weight 変更時に BMI を再計算して session_state["bmi"] を更新
+# Height/Weight 変更時に BMI を再計算するコールバック
 def recompute_bmi():
     hs = st.session_state.get("height_str", "")
     ws = st.session_state.get("weight_str", "")
@@ -79,36 +76,37 @@ def recompute_bmi():
             bmi_val = w / (h / 100) ** 2
             st.session_state["bmi"] = f"{bmi_val:.1f}"
     except Exception:
-        # 数値でなければ何もしない（既存BMIは保持）
+        # 未入力や非数値ならスルー（手入力BMIは保持）
         pass
 
-age_str = st.text_input("Age (years)", placeholder="ex) 65")
+age_str = st.text_input("Age (years)", placeholder="e.g. 65")
 
+# Height/Weight: ラベルは (at surgery)、help は「Height (at surgery, …)」形式
 height_str = st.text_input(
     "Height (cm) (at surgery)",
     key="height_str",
-    placeholder="ex) 160.0",
-    help="Height at surgery. Used for BMI calculation.",
+    placeholder="e.g. 160.0 — unnecessary if entering BMI directly",
+    help="Height (at surgery, used for BMI calculation).",
     on_change=recompute_bmi,
 )
 
 weight_str = st.text_input(
     "Weight (kg) (at surgery)",
     key="weight_str",
-    placeholder="ex) 50.0",
-    help="Weight at surgery. Used for BMI calculation.",
+    placeholder="e.g. 50.0 — unnecessary if entering BMI directly",
+    help="Weight (at surgery, used for BMI calculation).",
     on_change=recompute_bmi,
 )
 
-# BMI は常に表示。Height/Weight 変更時は自動上書き。直接入力も可。
+# BMI（手術時）: 直接入力可能。Height/Weight 変更時は自動上書き
 bmi_str = st.text_input(
     "BMI (kg/m²) (at surgery)",
     key="bmi",
     help="BMI at surgery. Automatically calculated from Height and Weight, but can also be entered directly.",
 )
 
-cea_str   = st.text_input("CEA (ng/mL)", placeholder="ex) 4.5")
-ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="ex) 25")
+cea_str   = st.text_input("CEA (ng/mL)", placeholder="e.g. 4.5")
+ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="e.g. 25")
 
 asa  = st.selectbox("ASA-PS", asa_map.keys(), index=None, placeholder="Select ASA-PS")
 surg = st.selectbox("Surgical method", surg_map.keys(), index=None, placeholder="Select surgical method")
@@ -124,7 +122,7 @@ else:  # DG
 recon = st.selectbox("Reconstruction", recon_options, index=None, placeholder="Select reconstruction")
 
 macro = st.selectbox("Macroscopic type", macro_map.keys(), index=None, placeholder="Select macroscopic type")
-diam  = st.text_input("Tumor diameter (mm)", placeholder="ex) 45")
+diam  = st.text_input("Tumor diameter (mm)", placeholder="e.g. 45")
 histo = st.selectbox("Histology", histo_map.keys(), index=None, placeholder="Select histology")
 vcat  = st.selectbox("Vascular invasion (v)", v_map.keys(), index=None, placeholder="Select vascular invasion")
 pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="Select pT")
@@ -140,28 +138,29 @@ if pt and pn:
         stage_options = [auto_stage, "IV (CY1)"]
 
 stage = st.selectbox(
-    "Pathological stage (auto-calculated from pT & pN, or IV (CY1))",
+    "Pathological stage",
     stage_options,
     index=None,
-    placeholder="Select stage"
+    placeholder="Select stage",
+    help="Auto-calculated from pT & pN when provided; you may also select 'IV (CY1)'."
 )
 
 # ────────────────────────────────────────────────────────────
-# 5. Prediction
+# 5. Prediction（Height/Weight は任意。BMI が必須）
 # ────────────────────────────────────────────────────────────
 if st.button("Predict"):
+    # 必須: age, bmi, cea, ca19-9, diameter
     try:
         age = int(age_str)
-        h = float(st.session_state["height_str"])
-        w = float(st.session_state["weight_str"])
         bmi = float(st.session_state["bmi"])  # 手入力 or 自動計算が反映済み
         cea = float(cea_str)
         ca199 = float(ca199_str)
         diam_val = float(diam)
     except ValueError:
-        st.error("Age, Height, Weight, BMI, CEA, CA19-9, Diameter must be numeric.")
+        st.error("Age, BMI, CEA, CA19-9, and Diameter must be numeric.")
         st.stop()
 
+    # カテゴリ未選択などの KeyError を捕捉
     try:
         inp = pd.DataFrame([{
             "age": age,
@@ -232,5 +231,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
