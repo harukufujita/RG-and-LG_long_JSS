@@ -246,20 +246,6 @@ if st.button("Predict"):
     ax.legend()
     st.pyplot(fig)
 
-
-    # 図示
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(time_grid, surv_rfs, lw=2, label="RFS")
-    ax.plot(time_grid, surv_os,  lw=2, label="OS")
-    ax.set_xlabel("Months after surgery")
-    ax.set_ylabel("Survival probability")
-    ax.set_xlim(0, 36)
-    ax.set_ylim(0, 1.05)
-    ax.set_xticks(np.arange(0, 37, 6))
-    ax.grid(alpha=0.3)
-    ax.legend()
-    st.pyplot(fig)
-
 st.markdown(
     """
     <div style='margin-top:2rem; font-size:0.85em; color:gray;'>
