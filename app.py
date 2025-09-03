@@ -191,3 +191,15 @@ if st.button("Predict"):
     ax.grid(alpha=0.3)
     ax.legend()
     st.pyplot(fig)
+
+st.markdown(
+    """
+    <div style='margin-top:2rem; font-size:0.85em; color:gray;'>
+    <b>Note:</b> This model was developed for patients with gastric or gastroesophageal junction 
+    adenocarcinoma who underwent either robot-assisted or laparoscopic gastrectomy. 
+    Cases with distant metastasis were excluded, but CY1 cases were included. 
+    Patients with R2 resection were excluded.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
