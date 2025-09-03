@@ -67,16 +67,14 @@ st.markdown(
 )
 
 # ────────────────────────────────────────────────────────────
-# 4. Input widgets（Height → Weight → BMI）
+# 4. Input widgets
 # ────────────────────────────────────────────────────────────
-# session_state 初期化
 for key, default in [("height_str", ""), ("weight_str", ""), ("bmi", "")]:
     if key not in st.session_state:
         st.session_state[key] = default
 
 age_str = st.text_input("Age (years)", placeholder="e.g. 65")
 
-# Height/Weight（手術時）
 height_str = st.text_input(
     "Height (cm) (at surgery)",
     key="height_str",
@@ -90,26 +88,27 @@ weight_str = st.text_input(
     help="Weight (at surgery, used for BMI calculation).",
 )
 
-# BMI入力欄
-bmi_str = st.text_input(
-    "BMI (kg/m²) (at surgery)",
-    key="bmi",
-    help="BMI at surgery. Press the button below to calculate from Height and Weight, or enter directly.",
-)
-
-# BMIを計算するボタン
+# --- BMI計算ボタンをBMI入力欄の上に配置 ---
 if st.button("Calculate BMI from Height & Weight"):
     try:
         h = float(st.session_state["height_str"])
         w = float(st.session_state["weight_str"])
         if h > 0:
             bmi_val = w / (h / 100) ** 2
-            st.session_state["bmi"] = f"{bmi_val:.1f}"
-            st.success(f"BMI calculated: {st.session_state['bmi']}")
+            st.session_state.bmi = f"{bmi_val:.1f}"
+            st.experimental_rerun()
         else:
             st.error("Height must be > 0.")
     except ValueError:
         st.error("Height and Weight must be numeric.")
+
+# BMI入力欄
+bmi_str = st.text_input(
+    "BMI (kg/m²) (at surgery)",
+    value=st.session_state.get("bmi", ""),
+    key="bmi",
+    help="BMI at surgery. Press the button above to calculate from Height and Weight, or enter directly.",
+)
 
 cea_str   = st.text_input("CEA (ng/mL)", placeholder="e.g. 4.5")
 ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="e.g. 25")
@@ -117,19 +116,17 @@ ca199_str = st.text_input("CA19-9 (U/mL)", placeholder="e.g. 25")
 asa  = st.selectbox("ASA-PS", asa_map.keys(), index=None, placeholder="Select ASA-PS")
 surg = st.selectbox("Surgical method", surg_map.keys(), index=None, placeholder="Select surgical method")
 
-# 術式に応じて再建方法
 if surg == "PG":
     recon_options = ["R-Y", "Others"]
 elif surg == "TG":
     recon_options = ["R-Y", "Others"]
-else:  # DG
+else:
     recon_options = list(recons_map.keys())
 
 recon = st.selectbox("Reconstruction", recon_options, index=None, placeholder="Select reconstruction")
 
 macro = st.selectbox("Macroscopic type", macro_map.keys(), index=None, placeholder="Select macroscopic type")
 
-# Tumor diameter：不明なら未入力でOK（pTで内部補完）
 diam = st.text_input(
     "Tumor diameter (mm)",
     placeholder="e.g. 45 — not required if unknown"
@@ -140,7 +137,6 @@ vcat  = st.selectbox("Vascular invasion (v)", v_map.keys(), index=None, placehol
 pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="Select pT")
 pn    = st.selectbox("Pathological N", pn_map.keys(), index=None, placeholder="Select pN")
 
-# pStage は常に表示。pT/pN が入れば候補を絞る（自動候補 + "IV (CY1)"）
 all_stage_options = list(stage_map.keys())
 stage_options = all_stage_options
 auto_stage = None
@@ -161,17 +157,15 @@ stage = st.selectbox(
 # 5. Prediction
 # ────────────────────────────────────────────────────────────
 if st.button("Predict"):
-    # 必須: age, bmi, cea, ca19-9
     try:
         age = int(age_str)
-        bmi = float(st.session_state["bmi"])  # 手入力 or 計算済み
+        bmi = float(st.session_state["bmi"])
         cea = float(cea_str)
         ca199 = float(ca199_str)
     except ValueError:
         st.error("Age, BMI, CEA, and CA19-9 must be numeric.")
         st.stop()
 
-    # 腫瘍径：入力があれば使用。無ければ pT がある場合のみ内部補完
     diam_val = None
     if diam and str(diam).strip():
         try:
@@ -183,7 +177,6 @@ if st.button("Predict"):
         if pt:
             diam_val = impute_diameter_from_pt(pt)
 
-    # 入力行の構築
     try:
         inp = pd.DataFrame([{
             "age": age,
@@ -205,7 +198,6 @@ if st.button("Predict"):
         st.error("Please complete the required categorical fields (e.g., ASA-PS, Surgical method, Reconstruction, Macroscopic type, Histology, V, pT, pN, Stage).")
         st.stop()
 
-    # 学習時の特徴量順に合わせる
     try:
         inp_rfs = inp[rsf_rfs.feature_names_in_]
         inp_os  = inp[rsf_os.feature_names_in_]
@@ -213,7 +205,6 @@ if st.button("Predict"):
         st.error(f"Feature alignment error: {e}")
         st.stop()
 
-    # 予測
     time_grid = np.arange(0, 37)
     surv_rfs = np.mean(
         [np.interp(time_grid, fn.x, fn.y) for fn in rsf_rfs.predict_survival_function(inp_rfs)],
@@ -224,17 +215,15 @@ if st.button("Predict"):
         axis=0
     )
 
-    # ★ OS は常に RFS 以上に補正
+    # OS ≥ RFS を保証
     surv_os = np.maximum(surv_os, surv_rfs)
 
-    # 3年値
     rfs36 = float(surv_rfs[time_grid == 36]) * 100
     os36  = float(surv_os[time_grid == 36]) * 100
 
     st.success(f"Predicted 3-year RFS: **{rfs36:.1f}%**")
     st.success(f"Predicted 3-year OS:  **{os36:.1f}%**")
 
-    # 図示
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(time_grid, surv_rfs, lw=2, label="RFS")
     ax.plot(time_grid, surv_os,  lw=2, label="OS")
@@ -258,6 +247,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 
 
