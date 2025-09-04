@@ -21,7 +21,7 @@ rsf_os  = load_model("rsf_final_os_14vars.pkl")    # OSモデル
 # 1. Encoding maps
 # ────────────────────────────────────────────────────────────
 asa_map = {"1": 0, "2": 1, "≥3": 2}
-surg_map = {"DG": 0, "PG": 1, "TG": 2}
+surg_map = {"DG": 0, "TG": 2, "PG": 1}
 recons_map = {"B-I": 0, "B-II": 1, "R-Y": 2, "Others": 3}
 macro_map = {"type0": 0, "type1": 1, "type2": 2, "type3": 3, "type4": 4, "type5": 5}
 v_map = {"v0": 0, "v1": 1}
