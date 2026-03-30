@@ -14,8 +14,8 @@ import joblib
 def load_model(path: str):
     return joblib.load(path)
 
-rsf_rfs = load_model("rsf_final_14vars.pkl")       # RFSモデル
-rsf_os  = load_model("rsf_final_os_14vars.pkl")    # OSモデル
+rsf_rfs = load_model("rsf_final_15vars.pkl")       # RFSモデル
+rsf_os  = load_model("rsf_final_os_16vars.pkl")    # OSモデル
 
 # ────────────────────────────────────────────────────────────
 # 1. Encoding maps
@@ -25,6 +25,9 @@ surg_map = {"DG": 0, "TG": 2, "PG": 1}
 recons_map = {"B-I": 0, "B-II": 1, "R-Y": 2, "Others": 3}
 macro_map = {"type0": 0, "type1": 1, "type2": 2, "type3": 3, "type4": 4, "type5": 5}
 v_map = {"v0": 0, "v1": 1}
+ly_map = {"ly0": 0, "ly1": 1}
+cd3a_map = {"no": 0, "yes": 1}
+sex_map = {"female": 0, "male": 1}
 histo_map = {"pap": 0, "tub": 1, "por": 2, "sig": 3, "muc": 4}
 pt_map = {"pT0": 0, "pT1a": 1, "pT1b": 2, "pT2": 3, "pT3": 4, "pT4a": 5, "pT4b": 6}
 pn_map = {"pN0": 0, "pN1": 1, "pN2": 2, "pN3a": 3, "pN3b": 4}
@@ -75,6 +78,9 @@ for key, default in [("height_str", ""), ("weight_str", ""), ("bmi", "")]:
 
 age_str = st.text_input("Age (years)", placeholder="e.g. 65")
 
+# Sex は Age の1つ下
+sex = st.selectbox("Sex", sex_map.keys(), index=None, placeholder="Select sex")
+
 height_str = st.text_input(
     "Height (cm) (at surgery)",
     key="height_str",
@@ -96,12 +102,11 @@ if st.button("Calculate BMI from Height & Weight"):
         if h > 0:
             bmi_val = w / (h / 100) ** 2
             st.session_state.bmi = f"{bmi_val:.1f}"
-            st.rerun()  # ← st.experimental_rerun() から変更
+            st.rerun()
         else:
             st.error("Height must be > 0.")
     except ValueError:
         st.error("Height and Weight must be numeric.")
-
 
 # BMI入力欄
 bmi_str = st.text_input(
@@ -126,6 +131,14 @@ else:
 
 recon = st.selectbox("Reconstruction", recon_options, index=None, placeholder="Select reconstruction")
 
+# CD3a は Reconstruction の1つ下
+cd3a = st.selectbox(
+    "Postoperative complication (CD≥IIIa)",
+    cd3a_map.keys(),
+    index=None,
+    placeholder="Select postoperative complication"
+)
+
 macro = st.selectbox("Macroscopic type", macro_map.keys(), index=None, placeholder="Select macroscopic type")
 
 diam = st.text_input(
@@ -135,6 +148,15 @@ diam = st.text_input(
 
 histo = st.selectbox("Histology", histo_map.keys(), index=None, placeholder="Select histology")
 vcat  = st.selectbox("Vascular invasion (v)", v_map.keys(), index=None, placeholder="Select vascular invasion")
+
+# ly は Vascular invasion (v) の1つ下
+lycat = st.selectbox(
+    "Lymphatic invasion (ly)",
+    ly_map.keys(),
+    index=None,
+    placeholder="Select lymphatic invasion"
+)
+
 pt    = st.selectbox("Pathological T", pt_map.keys(), index=None, placeholder="Select pT")
 pn    = st.selectbox("Pathological N", pn_map.keys(), index=None, placeholder="Select pN")
 
@@ -181,22 +203,29 @@ if st.button("Predict"):
     try:
         inp = pd.DataFrame([{
             "age": age,
+            "sex2": sex_map[sex],
             "bmi": bmi,
             "cea_3": cea,
             "ca19_9_3": ca199,
             "asa_ps_2": asa_map[asa],
             "surgical_method2": surg_map[surg],
             "reconstruction2": recons_map[recon],
+            "CD3a": cd3a_map[cd3a],
             "macro2": macro_map[macro],
             "diameter2": diam_val if diam_val is not None else np.nan,
             "histology2": histo_map[histo],
             "v2": v_map[vcat],
+            "ly2": ly_map[lycat],
             "p_t_3": pt_map[pt],
             "p_n_3": pn_map[pn],
             "p_stage3": stage_map[stage] if stage else np.nan,
         }])
     except KeyError:
-        st.error("Please complete the required categorical fields (e.g., ASA-PS, Surgical method, Reconstruction, Macroscopic type, Histology, V, pT, pN, Stage).")
+        st.error(
+            "Please complete the required categorical fields "
+            "(e.g., Sex, ASA-PS, Surgical method, Reconstruction, Postoperative complication, "
+            "Macroscopic type, Histology, V, LY, pT, pN, Stage)."
+        )
         st.stop()
 
     try:
@@ -248,5 +277,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
